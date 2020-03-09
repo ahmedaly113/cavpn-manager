@@ -1,13 +1,13 @@
 [Unit]
-Description=wireguard manager
+Description=cavpn manager
 After=network.target
 StartLimitIntervalSec=0
 
 [Service]
-User=wireguard-manager
+User=cavpn-manager
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
-EnvironmentFile=/etc/default/wireguard-manager
-ExecStart=/usr/local/bin/wireguard-manager
+EnvironmentFile=/etc/default/cavpn-manager
+ExecStart=/usr/local/bin/cavpn-manager
 Restart=always
 RestartSec=1
 

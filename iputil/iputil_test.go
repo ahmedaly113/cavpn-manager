@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/mullvad/wg-manager/iputil"
+	"github.com/ahmedaly113/cavpn-manager/iputil"
 )
 
 var ipNet = []net.IPNet{

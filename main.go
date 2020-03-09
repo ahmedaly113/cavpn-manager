@@ -14,17 +14,17 @@ import (
 	"time"
 
 	"github.com/DMarby/jitter"
+	"github.com/ahmedaly113/cavpn-manager/api"
+	"github.com/ahmedaly113/cavpn-manager/api/subscriber"
+	"github.com/ahmedaly113/cavpn-manager/portforward"
+	"github.com/ahmedaly113/cavpn-manager/cavpn"
 	"github.com/infosum/statsd"
 	"github.com/jamiealquiza/envy"
-	"github.com/mullvad/wg-manager/api"
-	"github.com/mullvad/wg-manager/api/subscriber"
-	"github.com/mullvad/wg-manager/portforward"
-	"github.com/mullvad/wg-manager/wireguard"
 )
 
 var (
 	a          *api.API
-	wg         *wireguard.Wireguard
+	cv         *cavpn.cavpn
 	pf         *portforward.Portforward
 	metrics    *statsd.Client
 	appVersion string // Populated during build time
@@ -32,13 +32,13 @@ var (
 
 func main() {
 	// Set up commandline flags
-	interval := flag.Duration("interval", time.Minute, "how often wireguard peers will be synchronized with the api")
+	interval := flag.Duration("interval", time.Minute, "how often cavpn peers will be synchronized with the api")
 	delay := flag.Duration("delay", time.Second*45, "max random delay for the synchronization")
 	apiTimeout := flag.Duration("api-timeout", time.Second*30, "max duration for API requests")
 	url := flag.String("url", "https://example.com", "api url")
 	username := flag.String("username", "", "api username")
 	password := flag.String("password", "", "api password")
-	interfaces := flag.String("interfaces", "wg0", "wireguard interfaces to configure. Pass a comma delimited list to configure multiple interfaces, eg 'wg0,wg1,wg2'")
+	interfaces := flag.String("interfaces", "cv0", "cavpn interfaces to configure. Pass a comma delimited list to configure multiple interfaces, eg 'cv0,cv1,cv2'")
 	portForwardingChain := flag.String("portforwarding-chain", "PORTFORWARDING", "iptables chain to use for portforwarding")
 	portForwardingIpsetIPv4 := flag.String("portforwarding-ipset-ipv4", "PORTFORWARDING_IPV4", "ipset table to use for portforwarding for ipv4 addresses.")
 	portForwardingIpsetIPv6 := flag.String("portforwarding-ipset-ipv6", "PORTFORWARDING_IPV6", "ipset table to use for portforwarding for ipv6 addresses.")
@@ -46,10 +46,10 @@ func main() {
 	mqURL := flag.String("mq-url", "wss://example.com/mq", "message-queue url")
 	mqUsername := flag.String("mq-username", "", "message-queue username")
 	mqPassword := flag.String("mq-password", "", "message-queue password")
-	mqChannel := flag.String("mq-channel", "wireguard", "message-queue channel")
+	mqChannel := flag.String("mq-channel", "cavpn", "message-queue channel")
 
 	// Parse environment variables
-	envy.Parse("WG")
+	envy.Parse("cv")
 
 	// Add flag to output the version
 	version := flag.Bool("v", false, "prints current app version")
@@ -62,11 +62,11 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Printf("starting wg-manager %s", appVersion)
+	log.Printf("starting cavpn-manager %s", appVersion)
 
 	// Initialize metrics
 	var err error
-	metrics, err = statsd.New(statsd.TagsFormat(statsd.Datadog), statsd.Prefix("wireguard"), statsd.Address(*statsdAddress))
+	metrics, err = statsd.New(statsd.TagsFormat(statsd.Datadog), statsd.Prefix("cavpn"), statsd.Address(*statsdAddress))
 	if err != nil {
 		log.Fatalf("Error initializing metrics %s", err)
 	}
@@ -82,18 +82,18 @@ func main() {
 		},
 	}
 
-	// Initialize Wireguard
+	// Initialize cavpn
 	if *interfaces == "" {
-		log.Fatalf("no wireguard interfaces configured")
+		log.Fatalf("no cavpn interfaces configured")
 	}
 
 	interfacesList := strings.Split(*interfaces, ",")
 
-	wg, err = wireguard.New(interfacesList, metrics)
+	cv, err = cavpn.New(interfacesList, metrics)
 	if err != nil {
-		log.Fatalf("error initializing wireguard %s", err)
+		log.Fatalf("error initializing cavpn %s", err)
 	}
-	defer wg.Close()
+	defer cv.Close()
 
 	// Initialize portforward
 	pf, err = portforward.New(*portForwardingChain, *portForwardingIpsetIPv4, *portForwardingIpsetIPv6)
@@ -116,7 +116,7 @@ func main() {
 		Channel:  *mqChannel,
 		Metrics:  metrics,
 	}
-	eventChannel := make(chan subscriber.WireguardEvent)
+	eventChannel := make(chan subscriber.cavpnEvent)
 	defer close(eventChannel)
 
 	err = s.Subscribe(shutdownCtx, eventChannel)
@@ -124,7 +124,7 @@ func main() {
 		log.Fatal("error connecting to message-queue", err)
 	}
 
-	// Create a ticker to run our logic for polling the api and updating wireguard peers
+	// Create a ticker to run our logic for polling the api and updating cavpn peers
 	ticker := jitter.NewTicker(*interval, *delay)
 	go func() {
 		for {
@@ -147,13 +147,13 @@ func main() {
 	log.Printf("shutting down: %s", err)
 }
 
-func handleEvent(event subscriber.WireguardEvent) {
+func handleEvent(event subscriber.cavpnEvent) {
 	switch event.Action {
 	case "ADD":
-		wg.AddPeer(event.Peer)
+		cv.AddPeer(event.Peer)
 		pf.AddPortforwarding(event.Peer)
 	case "REMOVE":
-		wg.RemovePeer(event.Peer)
+		cv.RemovePeer(event.Peer)
 		pf.RemovePortforwarding(event.Peer)
 	default: // Bad data from the API, ignore it
 	}
@@ -163,16 +163,16 @@ func synchronize() {
 	defer metrics.NewTiming().Send("synchronize_time")
 
 	t := metrics.NewTiming()
-	peers, err := a.GetWireguardPeers()
+	peers, err := a.GetcavpnPeers()
 	if err != nil {
 		metrics.Increment("error_getting_peers")
 		log.Printf("error getting peers %s", err.Error())
 		return
 	}
-	t.Send("get_wireguard_peers_time")
+	t.Send("get_cavpn_peers_time")
 
 	t = metrics.NewTiming()
-	wg.UpdatePeers(peers)
+	cv.UpdatePeers(peers)
 	t.Send("update_peers_time")
 
 	t = metrics.NewTiming()

@@ -1,4 +1,4 @@
-package wireguard
+package cavpn
 
 import (
 	"fmt"
@@ -6,24 +6,24 @@ import (
 	"net"
 	"time"
 
+	"github.com/ahmedaly113/cavpn-manager/api"
 	"github.com/infosum/statsd"
-	"github.com/mullvad/wg-manager/api"
 
-	"github.com/mullvad/wg-manager/iputil"
-	"golang.zx2c4.com/wireguard/wgctrl"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"github.com/ahmedaly113/cavpn-manager/iputil"
+	"golang.zx2c4.com/cavpn/cvctrl"
+	"golang.zx2c4.com/cavpn/cvctrl/cvtypes"
 )
 
-// Wireguard is a utility for managing wireguard configuration
-type Wireguard struct {
-	client     *wgctrl.Client
+// cavpn is a utility for managing cavpn configuration
+type cavpn struct {
+	client     *cvctrl.Client
 	interfaces []string
 	metrics    *statsd.Client
 }
 
-// New ensures that the interfaces given are valid, and returns a new Wireguard instance
-func New(interfaces []string, metrics *statsd.Client) (*Wireguard, error) {
-	client, err := wgctrl.New()
+// New ensures that the interfaces given are valid, and returns a new cavpn instance
+func New(interfaces []string, metrics *statsd.Client) (*cavpn, error) {
+	client, err := cvctrl.New()
 	if err != nil {
 		return nil, err
 	}
@@ -31,43 +31,43 @@ func New(interfaces []string, metrics *statsd.Client) (*Wireguard, error) {
 	for _, i := range interfaces {
 		_, err := client.Device(i)
 		if err != nil {
-			return nil, fmt.Errorf("error getting wireguard interface %s: %s", i, err.Error())
+			return nil, fmt.Errorf("error getting cavpn interface %s: %s", i, err.Error())
 		}
 	}
 
-	return &Wireguard{
+	return &cavpn{
 		client:     client,
 		interfaces: interfaces,
 		metrics:    metrics,
 	}, nil
 }
 
-// UpdatePeers updates the configuration of the wireguard interfaces to match the given list of peers
-func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) {
+// UpdatePeers updates the configuration of the cavpn interfaces to match the given list of peers
+func (w *cavpn) UpdatePeers(peers api.cavpnPeerList) {
 	peerMap := w.mapPeers(peers)
 
 	var connectedPeers int
 	for _, d := range w.interfaces {
 		device, err := w.client.Device(d)
-		// Log an error, but move on, so that one broken wireguard interface doesn't prevent us from configuring the rest
+		// Log an error, but move on, so that one broken cavpn interface doesn't prevent us from configuring the rest
 		if err != nil {
-			log.Printf("error connecting to wireguard interface %s: %s", d, err.Error())
+			log.Printf("error connecting to cavpn interface %s: %s", d, err.Error())
 			continue
 		}
 
 		connectedPeers += countConnectedPeers(device.Peers)
 
 		existingPeerMap := mapExistingPeers(device.Peers)
-		cfgPeers := []wgtypes.PeerConfig{}
-		resetPeers := []wgtypes.PeerConfig{}
+		cfgPeers := []cvtypes.PeerConfig{}
+		resetPeers := []cvtypes.PeerConfig{}
 
 		// Loop through peers from the API
-		// Add peers not currently existing in the wireguard config
-		// Update peers that exist in the wireguard config but has changed
+		// Add peers not currently existing in the cavpn config
+		// Update peers that exist in the cavpn config but has changed
 		for key, allowedIPs := range peerMap {
 			existingPeer, ok := existingPeerMap[key]
 			if !ok || !iputil.EqualIPNet(allowedIPs, existingPeer.AllowedIPs) {
-				cfgPeers = append(cfgPeers, wgtypes.PeerConfig{
+				cfgPeers = append(cfgPeers, cvtypes.PeerConfig{
 					PublicKey:         key,
 					ReplaceAllowedIPs: true,
 					AllowedIPs:        allowedIPs,
@@ -75,32 +75,32 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) {
 			}
 		}
 
-		// Loop through the current peers in the wireguard config
+		// Loop through the current peers in the cavpn config
 		for key, peer := range existingPeerMap {
 			if _, ok := peerMap[key]; !ok {
 				// Remove peers that doesn't exist in the API
-				cfgPeers = append(cfgPeers, wgtypes.PeerConfig{
+				cfgPeers = append(cfgPeers, cvtypes.PeerConfig{
 					PublicKey: key,
 					Remove:    true,
 				})
 			} else if needsReset(peer) {
 				// Remove peers that's previously been active and should be reset to remove data
-				cfgPeers = append(cfgPeers, wgtypes.PeerConfig{
+				cfgPeers = append(cfgPeers, cvtypes.PeerConfig{
 					PublicKey: key,
 					Remove:    true,
 				})
 
-				peerCfg := wgtypes.PeerConfig{
+				peerCfg := cvtypes.PeerConfig{
 					PublicKey:         key,
 					ReplaceAllowedIPs: true,
 					AllowedIPs:        peer.AllowedIPs,
 				}
 
 				// Copy the preshared key if one is set
-				var emptyKey wgtypes.Key
+				var emptyKey cvtypes.Key
 				if peer.PresharedKey != emptyKey {
 					// We need to copy the key, or the pointer gets corrupted for some reason
-					var copiedKey wgtypes.Key
+					var copiedKey cvtypes.Key
 					copy(copiedKey[:], peer.PresharedKey[:])
 					peerCfg.PresharedKey = &copiedKey
 				}
@@ -116,12 +116,12 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) {
 		}
 
 		// Add new peers, remove deleted peers, and remove peers should be reset
-		err = w.client.ConfigureDevice(d, wgtypes.Config{
+		err = w.client.ConfigureDevice(d, cvtypes.Config{
 			Peers: cfgPeers,
 		})
 
 		if err != nil {
-			log.Printf("error configuring wireguard interface %s: %s", d, err.Error())
+			log.Printf("error configuring cavpn interface %s: %s", d, err.Error())
 			continue
 		}
 
@@ -131,12 +131,12 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) {
 		}
 
 		// Re-add the peers we removed to reset in the previous step
-		err = w.client.ConfigureDevice(d, wgtypes.Config{
+		err = w.client.ConfigureDevice(d, cvtypes.Config{
 			Peers: resetPeers,
 		})
 
 		if err != nil {
-			log.Printf("error configuring wireguard interface %s: %s", d, err.Error())
+			log.Printf("error configuring cavpn interface %s: %s", d, err.Error())
 			continue
 		}
 	}
@@ -145,9 +145,9 @@ func (w *Wireguard) UpdatePeers(peers api.WireguardPeerList) {
 	w.metrics.Gauge("connected_peers", connectedPeers)
 }
 
-// Take the wireguard peers and convert them into a map for easier comparison
-func (w *Wireguard) mapPeers(peers api.WireguardPeerList) (peerMap map[wgtypes.Key][]net.IPNet) {
-	peerMap = make(map[wgtypes.Key][]net.IPNet)
+// Take the cavpn peers and convert them into a map for easier comparison
+func (w *cavpn) mapPeers(peers api.cavpnPeerList) (peerMap map[cvtypes.Key][]net.IPNet) {
+	peerMap = make(map[cvtypes.Key][]net.IPNet)
 
 	// Ignore peers with errors, in-case we get bad data from the API
 	for _, peer := range peers {
@@ -165,9 +165,9 @@ func (w *Wireguard) mapPeers(peers api.WireguardPeerList) (peerMap map[wgtypes.K
 	return
 }
 
-// Take the existing wireguard peers and convert them into a map for easier comparison
-func mapExistingPeers(peers []wgtypes.Peer) (peerMap map[wgtypes.Key]wgtypes.Peer) {
-	peerMap = make(map[wgtypes.Key]wgtypes.Peer)
+// Take the existing cavpn peers and convert them into a map for easier comparison
+func mapExistingPeers(peers []cvtypes.Peer) (peerMap map[cvtypes.Key]cvtypes.Peer) {
+	peerMap = make(map[cvtypes.Key]cvtypes.Peer)
 
 	for _, peer := range peers {
 		peerMap[peer.PublicKey] = peer
@@ -176,12 +176,12 @@ func mapExistingPeers(peers []wgtypes.Peer) (peerMap map[wgtypes.Key]wgtypes.Pee
 	return
 }
 
-// Wireguard sends a handshake roughly every 2 minutes
+// cavpn sends a handshake roughly every 2 minutes
 // So we consider all peers with a handshake within that interval to be connected
 const handshakeInterval = time.Minute * 2
 
-// Count the connected wireguard peers
-func countConnectedPeers(peers []wgtypes.Peer) (connectedPeers int) {
+// Count the connected cavpn peers
+func countConnectedPeers(peers []cvtypes.Peer) (connectedPeers int) {
 	for _, peer := range peers {
 		if time.Since(peer.LastHandshakeTime) <= handshakeInterval {
 			connectedPeers++
@@ -191,11 +191,11 @@ func countConnectedPeers(peers []wgtypes.Peer) (connectedPeers int) {
 	return
 }
 
-// A wireguard session can't last for longer then 3 minutes
+// A cavpn session can't last for longer then 3 minutes
 const inactivityTime = time.Minute * 3
 
 // Whether a peer should be reset or not, to zero out last handshake/bandwidth information
-func needsReset(peer wgtypes.Peer) bool {
+func needsReset(peer cvtypes.Peer) bool {
 	if !peer.LastHandshakeTime.IsZero() && time.Since(peer.LastHandshakeTime) > inactivityTime {
 		return true
 	}
@@ -203,8 +203,8 @@ func needsReset(peer wgtypes.Peer) bool {
 	return false
 }
 
-// AddPeer adds the given peer to the wireguard interfaces, without checking the existing configuration
-func (w *Wireguard) AddPeer(peer api.WireguardPeer) {
+// AddPeer adds the given peer to the cavpn interfaces, without checking the existing configuration
+func (w *cavpn) AddPeer(peer api.cavpnPeer) {
 	key, ipv4, ipv6, err := parsePeer(peer)
 	if err != nil {
 		return
@@ -212,9 +212,9 @@ func (w *Wireguard) AddPeer(peer api.WireguardPeer) {
 
 	for _, d := range w.interfaces {
 		// Add the peer
-		err := w.client.ConfigureDevice(d, wgtypes.Config{
-			Peers: []wgtypes.PeerConfig{
-				wgtypes.PeerConfig{
+		err := w.client.ConfigureDevice(d, cvtypes.Config{
+			Peers: []cvtypes.PeerConfig{
+				cvtypes.PeerConfig{
 					PublicKey:         key,
 					ReplaceAllowedIPs: true,
 					AllowedIPs: []net.IPNet{
@@ -226,14 +226,14 @@ func (w *Wireguard) AddPeer(peer api.WireguardPeer) {
 		})
 
 		if err != nil {
-			log.Printf("error configuring wireguard interface %s: %s", d, err.Error())
+			log.Printf("error configuring cavpn interface %s: %s", d, err.Error())
 			continue
 		}
 	}
 }
 
-// RemovePeer removes the given peer from the wireguard interfaces, without checking the existing configuration
-func (w *Wireguard) RemovePeer(peer api.WireguardPeer) {
+// RemovePeer removes the given peer from the cavpn interfaces, without checking the existing configuration
+func (w *cavpn) RemovePeer(peer api.cavpnPeer) {
 	key, _, _, err := parsePeer(peer)
 	if err != nil {
 		return
@@ -241,9 +241,9 @@ func (w *Wireguard) RemovePeer(peer api.WireguardPeer) {
 
 	for _, d := range w.interfaces {
 		// Remove the peer
-		err := w.client.ConfigureDevice(d, wgtypes.Config{
-			Peers: []wgtypes.PeerConfig{
-				wgtypes.PeerConfig{
+		err := w.client.ConfigureDevice(d, cvtypes.Config{
+			Peers: []cvtypes.PeerConfig{
+				cvtypes.PeerConfig{
 					PublicKey: key,
 					Remove:    true,
 				},
@@ -251,14 +251,14 @@ func (w *Wireguard) RemovePeer(peer api.WireguardPeer) {
 		})
 
 		if err != nil {
-			log.Printf("error configuring wireguard interface %s: %s", d, err.Error())
+			log.Printf("error configuring cavpn interface %s: %s", d, err.Error())
 			continue
 		}
 	}
 }
 
-func parsePeer(peer api.WireguardPeer) (key wgtypes.Key, ipv4 *net.IPNet, ipv6 *net.IPNet, err error) {
-	key, err = wgtypes.ParseKey(peer.Pubkey)
+func parsePeer(peer api.cavpnPeer) (key cvtypes.Key, ipv4 *net.IPNet, ipv6 *net.IPNet, err error) {
+	key, err = cvtypes.ParseKey(peer.Pubkey)
 	if err != nil {
 		return
 	}
@@ -276,7 +276,7 @@ func parsePeer(peer api.WireguardPeer) (key wgtypes.Key, ipv4 *net.IPNet, ipv6 *
 	return
 }
 
-// Close closes the underlying wireguard client
-func (w *Wireguard) Close() {
+// Close closes the underlying cavpn client
+func (w *cavpn) Close() {
 	w.client.Close()
 }

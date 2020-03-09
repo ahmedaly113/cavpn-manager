@@ -9,11 +9,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mullvad/wg-manager/api"
+	"github.com/ahmedaly113/cavpn-manager/api"
 )
 
-var fixture = api.WireguardPeerList{
-	api.WireguardPeer{
+var fixture = api.cavpnPeerList{
+	api.cavpnPeer{
 		IPv4:   "10.99.0.1/32",
 		IPv6:   "fc00:bbbb:bbbb:bb01::1/128",
 		Ports:  []int{1234, 4321},
@@ -37,7 +37,7 @@ func TestAPI(t *testing.T) {
 		Password: "bar",
 	}
 
-	peers, err := api.GetWireguardPeers()
+	peers, err := api.GetcavpnPeers()
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

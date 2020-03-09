@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -eu
 
-systemctl stop wireguard-manager.service || true
-systemctl disable wireguard-manager.service || true
+systemctl stop cavpn-manager.service || true
+systemctl disable cavpn-manager.service || true

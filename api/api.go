@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-// API is a utility for communicating with the Mullvad API
+// API is a utility for communicating with the ahmedaly113 API
 type API struct {
 	Username string
 	Password string
@@ -15,22 +15,22 @@ type API struct {
 	Client   *http.Client
 }
 
-// WireguardPeerList is a list of Wireguard peers
-type WireguardPeerList []WireguardPeer
+// cavpnPeerList is a list of cavpn peers
+type cavpnPeerList []cavpnPeer
 
-// WireguardPeer is a wireguard peer
-type WireguardPeer struct {
+// cavpnPeer is a cavpn peer
+type cavpnPeer struct {
 	IPv4   string `json:"ipv4"`
 	IPv6   string `json:"ipv6"`
 	Ports  []int  `json:"ports"`
 	Pubkey string `json:"pubkey"`
 }
 
-// GetWireguardPeers fetches a list of wireguard peers from the API and returns it
-func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
-	req, err := http.NewRequest("GET", a.BaseURL+"/wg/active-pubkeys/v2/", nil)
+// GetcavpnPeers fetches a list of cavpn peers from the API and returns it
+func (a *API) GetcavpnPeers() (cavpnPeerList, error) {
+	req, err := http.NewRequest("GET", a.BaseURL+"/cv/active-pubkeys/v2/", nil)
 	if err != nil {
-		return WireguardPeerList{}, err
+		return cavpnPeerList{}, err
 	}
 
 	if a.Username != "" && a.Password != "" {
@@ -39,20 +39,20 @@ func (a *API) GetWireguardPeers() (WireguardPeerList, error) {
 
 	response, err := a.Client.Do(req)
 	if err != nil {
-		return WireguardPeerList{}, err
+		return cavpnPeerList{}, err
 	}
 
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return WireguardPeerList{}, err
+		return cavpnPeerList{}, err
 	}
 
-	var decodedResponse WireguardPeerList
+	var decodedResponse cavpnPeerList
 	err = json.Unmarshal(body, &decodedResponse)
 	if err != nil {
-		return WireguardPeerList{}, fmt.Errorf("error decoding wireguard peers")
+		return cavpnPeerList{}, fmt.Errorf("error decoding cavpn peers")
 	}
 
 	return decodedResponse, nil

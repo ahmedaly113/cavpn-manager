@@ -5,18 +5,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ahmedaly113/cavpn-manager/api"
+	"github.com/ahmedaly113/cavpn-manager/portforward"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/mullvad/wg-manager/api"
-	"github.com/mullvad/wg-manager/portforward"
 )
 
 // Integration tests for portforwarding, not ran in short mode
 // Requires an iptables nat chain named PORTFORWARDING in both iptables and ip6tables
 
-var apiFixture = api.WireguardPeerList{
-	api.WireguardPeer{
+var apiFixture = api.cavpnPeerList{
+	api.cavpnPeer{
 		IPv4:   "10.99.0.1/32",
 		IPv6:   "fc00:bbbb:bbbb:bb01::1/128",
 		Ports:  []int{4321, 1234},
@@ -60,7 +60,7 @@ func TestPortforward(t *testing.T) {
 	})
 
 	t.Run("remove rules", func(t *testing.T) {
-		pf.UpdatePortforwarding(api.WireguardPeerList{})
+		pf.UpdatePortforwarding(api.cavpnPeerList{})
 
 		rules := getRules(t, ipts)
 		if diff := cmp.Diff([]string{}, rules); diff != "" {

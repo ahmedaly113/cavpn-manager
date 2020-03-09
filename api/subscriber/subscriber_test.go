@@ -10,16 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ahmedaly113/cavpn-manager/api"
+	"github.com/ahmedaly113/cavpn-manager/api/subscriber"
 	"github.com/infosum/statsd"
-	"github.com/mullvad/wg-manager/api"
-	"github.com/mullvad/wg-manager/api/subscriber"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
 
-var fixture = subscriber.WireguardEvent{
+var fixture = subscriber.cavpnEvent{
 	Action: "ADD",
-	Peer: api.WireguardPeer{
+	Peer: api.cavpnPeer{
 		IPv4:   "10.99.0.1/32",
 		IPv6:   "fc00:bbbb:bbbb:bb01::1/128",
 		Ports:  []int{1234, 4321},
@@ -74,7 +74,7 @@ func TestSubscriber(t *testing.T) {
 		Metrics:  metrics,
 	}
 
-	channel := make(chan subscriber.WireguardEvent)
+	channel := make(chan subscriber.cavpnEvent)
 	defer close(channel)
 
 	ctx, cancel := context.WithCancel(context.Background())

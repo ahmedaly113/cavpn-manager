@@ -1,4 +1,4 @@
-package wireguard_test
+package cavpn_test
 
 import (
 	"encoding/base64"
@@ -6,24 +6,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ahmedaly113/cavpn-manager/api"
+	"github.com/ahmedaly113/cavpn-manager/cavpn"
 	"github.com/google/go-cmp/cmp"
 	"github.com/infosum/statsd"
-	"github.com/mullvad/wg-manager/api"
-	"github.com/mullvad/wg-manager/wireguard"
-	"golang.zx2c4.com/wireguard/wgctrl"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"golang.zx2c4.com/cavpn/cvctrl"
+	"golang.zx2c4.com/cavpn/cvctrl/cvtypes"
 )
 
-// Integration tests for wireguard, not ran in short mode
-// Requires a wireguard interface named wg0 to be running on the system
+// Integration tests for cavpn, not ran in short mode
+// Requires a cavpn interface named cv0 to be running on the system
 
-const testInterface = "wg0"
+const testInterface = "cv0"
 
 var ipv4Net = net.ParseIP("10.99.0.0")
 var ipv6Net = net.ParseIP("fc00:bbbb:bbbb:bb01::")
 
-var apiFixture = api.WireguardPeerList{
-	api.WireguardPeer{
+var apiFixture = api.cavpnPeerList{
+	api.cavpnPeer{
 		IPv4:   "10.99.0.1/32",
 		IPv6:   "fc00:bbbb:bbbb:bb01::1/128",
 		Ports:  []int{1234, 4321},
@@ -31,8 +31,8 @@ var apiFixture = api.WireguardPeerList{
 	},
 }
 
-var peerFixture = []wgtypes.Peer{{
-	PublicKey: wgKey(),
+var peerFixture = []cvtypes.Peer{{
+	PublicKey: cvKey(),
 	AllowedIPs: []net.IPNet{
 		net.IPNet{
 			IP:   net.ParseIP("10.99.0.1"),
@@ -46,12 +46,12 @@ var peerFixture = []wgtypes.Peer{{
 	ProtocolVersion: 1,
 }}
 
-func wgKey() wgtypes.Key {
-	key, _ := wgtypes.NewKey([]byte(strings.Repeat("a", 32)))
+func cvKey() cvtypes.Key {
+	key, _ := cvtypes.NewKey([]byte(strings.Repeat("a", 32)))
 	return key
 }
 
-func TestWireguard(t *testing.T) {
+func Testcavpn(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration tests")
 	}
@@ -61,7 +61,7 @@ func TestWireguard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client, err := wgctrl.New()
+	client, err := cvctrl.New()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,14 +69,14 @@ func TestWireguard(t *testing.T) {
 	defer client.Close()
 	defer resetDevice(t, client)
 
-	wg, err := wireguard.New([]string{testInterface}, metrics)
+	cv, err := cavpn.New([]string{testInterface}, metrics)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer wg.Close()
+	defer cv.Close()
 
 	t.Run("add peers", func(t *testing.T) {
-		wg.UpdatePeers(apiFixture)
+		cv.UpdatePeers(apiFixture)
 
 		device, err := client.Device(testInterface)
 		if err != nil {
@@ -91,7 +91,7 @@ func TestWireguard(t *testing.T) {
 	t.Run("update peer ip", func(t *testing.T) {
 		apiFixture[0].IPv4 = "10.99.0.2/32"
 		apiFixture[0].IPv6 = "fc00:bbbb:bbbb:bb01::2/128"
-		wg.UpdatePeers(apiFixture)
+		cv.UpdatePeers(apiFixture)
 
 		device, err := client.Device(testInterface)
 		if err != nil {
@@ -107,20 +107,20 @@ func TestWireguard(t *testing.T) {
 	})
 
 	t.Run("remove peers", func(t *testing.T) {
-		wg.UpdatePeers(api.WireguardPeerList{})
+		cv.UpdatePeers(api.cavpnPeerList{})
 
 		device, err := client.Device(testInterface)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if diff := cmp.Diff([]wgtypes.Peer(nil), device.Peers); diff != "" {
+		if diff := cmp.Diff([]cvtypes.Peer(nil), device.Peers); diff != "" {
 			t.Fatalf("unexpected peers (-want +got):\n%s", diff)
 		}
 	})
 
 	t.Run("add single peer", func(t *testing.T) {
-		wg.AddPeer(apiFixture[0])
+		cv.AddPeer(apiFixture[0])
 
 		device, err := client.Device(testInterface)
 		if err != nil {
@@ -133,23 +133,23 @@ func TestWireguard(t *testing.T) {
 	})
 
 	t.Run("remove single peer", func(t *testing.T) {
-		wg.RemovePeer(apiFixture[0])
+		cv.RemovePeer(apiFixture[0])
 
 		device, err := client.Device(testInterface)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if diff := cmp.Diff([]wgtypes.Peer(nil), device.Peers); diff != "" {
+		if diff := cmp.Diff([]cvtypes.Peer(nil), device.Peers); diff != "" {
 			t.Fatalf("unexpected peers (-want +got):\n%s", diff)
 		}
 	})
 }
 
-func resetDevice(t *testing.T, c *wgctrl.Client) {
+func resetDevice(t *testing.T, c *cvctrl.Client) {
 	t.Helper()
 
-	cfg := wgtypes.Config{
+	cfg := cvtypes.Config{
 		ReplacePeers: true,
 	}
 
@@ -165,7 +165,7 @@ func TestInvalidInterface(t *testing.T) {
 
 	interfaceName := "nonexistant"
 
-	_, err := wireguard.New([]string{interfaceName}, nil)
+	_, err := cavpn.New([]string{interfaceName}, nil)
 	if err == nil {
 		t.Fatal("no error")
 	}

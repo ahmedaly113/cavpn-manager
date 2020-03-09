@@ -2,7 +2,7 @@
 set -eu
 
 function remove_user {
-  deluser --quiet --system wireguard-manager > /dev/null || \
+  deluser --quiet --system cavpn-manager > /dev/null || \
     echo "Failed to remove user"
 }
 

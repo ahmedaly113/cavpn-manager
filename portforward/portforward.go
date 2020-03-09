@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ahmedaly113/cavpn-manager/api"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/digineo/go-ipset/v2"
 	"github.com/mdlayher/netlink"
-	"github.com/mullvad/wg-manager/api"
 	"github.com/ti-mo/netfilter"
 )
 
@@ -110,7 +110,7 @@ func validateIPSet(name string) error {
 }
 
 // UpdatePortforwarding updates the iptables rules for portforwarding to match the given list of peers
-func (p *Portforward) UpdatePortforwarding(peers api.WireguardPeerList) {
+func (p *Portforward) UpdatePortforwarding(peers api.cavpnPeerList) {
 	rules := make(map[string]iptables.Protocol)
 	for _, peer := range peers {
 		if len(peer.Ports) < 1 {
@@ -160,7 +160,7 @@ func (p *Portforward) UpdatePortforwarding(peers api.WireguardPeerList) {
 }
 
 // AddPortforwarding tries to add portforwarding rules for a peer without checking existing ones
-func (p *Portforward) AddPortforwarding(peer api.WireguardPeer) {
+func (p *Portforward) AddPortforwarding(peer api.cavpnPeer) {
 	if len(peer.Ports) < 1 {
 		return
 	}
@@ -186,7 +186,7 @@ func (p *Portforward) AddPortforwarding(peer api.WireguardPeer) {
 }
 
 // RemovePortforwarding tries to remove portforwarding rules for a peer without checking existing ones
-func (p *Portforward) RemovePortforwarding(peer api.WireguardPeer) {
+func (p *Portforward) RemovePortforwarding(peer api.cavpnPeer) {
 	if len(peer.Ports) < 1 {
 		return
 	}
@@ -209,7 +209,7 @@ func (p *Portforward) RemovePortforwarding(peer api.WireguardPeer) {
 	}
 }
 
-func (p *Portforward) createPeerRules(peer api.WireguardPeer, rules map[string]iptables.Protocol) {
+func (p *Portforward) createPeerRules(peer api.cavpnPeer, rules map[string]iptables.Protocol) {
 	// Ignore ip's with errors, in-case we get bad data from the API
 	ipv4, _, err := net.ParseCIDR(peer.IPv4)
 	if err != nil {

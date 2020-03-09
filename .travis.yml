@@ -7,13 +7,13 @@ go:
 env:
 - GO111MODULE=on
 script:
-  # Install wireguard
+  # Install cavpn
   - sudo apt-get -y install software-properties-common
-  - sudo add-apt-repository -y ppa:wireguard/wireguard
+  - sudo add-apt-repository -y ppa:cavpn/cavpn
   - sudo apt-get -y update
-  - sudo apt-get -y install linux-headers-$(uname -r) wireguard-dkms ipset
-  - sudo ip link add wg0 type wireguard
-  - sudo ip link set up wg0
+  - sudo apt-get -y install linux-headers-$(uname -r) cavpn-dkms ipset
+  - sudo ip link add cv0 type cavpn
+  - sudo ip link set up cv0
   # Build the project and run the tests
   - make
   # Set up iptables
@@ -22,9 +22,9 @@ script:
   - sudo ipset create PORTFORWARDING_IPV4 hash:ip
   - sudo ipset create PORTFORWARDING_IPV6 hash:ip family inet6
   # Build the integration tests
-  - go test -c ./portforward && go test -c ./wireguard
+  - go test -c ./portforward && go test -c ./cavpn
   # Run integration tests
-  - sudo ./portforward.test -test.v && sudo ./wireguard.test -test.v
+  - sudo ./portforward.test -test.v && sudo ./cavpn.test -test.v
 
 notifications:
   email:

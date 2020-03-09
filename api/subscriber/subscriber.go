@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ahmedaly113/cavpn-manager/api"
 	"github.com/infosum/statsd"
-	"github.com/mullvad/wg-manager/api"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
 
-// Subscriber is a utility for receiving wireguard key events from a message-queue server
+// Subscriber is a utility for receiving cavpn key events from a message-queue server
 type Subscriber struct {
 	Username string
 	Password string
@@ -22,16 +22,16 @@ type Subscriber struct {
 	Metrics  *statsd.Client
 }
 
-// WireguardEvent is a wireguard key event
-type WireguardEvent struct {
+// cavpnEvent is a cavpn key event
+type cavpnEvent struct {
 	Action string            `json:"action"`
-	Peer   api.WireguardPeer `json:"peer"`
+	Peer   api.cavpnPeer `json:"peer"`
 }
 
 const subProtocol = "message-queue-v1"
 
 // Subscribe establishes a websocket connection for a message-queue channel, and emits messages on the given channel
-func (s *Subscriber) Subscribe(ctx context.Context, channel chan<- WireguardEvent) error {
+func (s *Subscriber) Subscribe(ctx context.Context, channel chan<- cavpnEvent) error {
 	err := s.connect(ctx, channel)
 
 	if err != nil {
@@ -41,7 +41,7 @@ func (s *Subscriber) Subscribe(ctx context.Context, channel chan<- WireguardEven
 	return nil
 }
 
-func (s *Subscriber) connect(ctx context.Context, channel chan<- WireguardEvent) error {
+func (s *Subscriber) connect(ctx context.Context, channel chan<- cavpnEvent) error {
 	header := http.Header{}
 
 	if s.Username != "" && s.Password != "" {
@@ -62,9 +62,9 @@ func (s *Subscriber) connect(ctx context.Context, channel chan<- WireguardEvent)
 	return nil
 }
 
-func (s *Subscriber) read(ctx context.Context, channel chan<- WireguardEvent, conn *websocket.Conn) {
+func (s *Subscriber) read(ctx context.Context, channel chan<- cavpnEvent, conn *websocket.Conn) {
 	for {
-		v := WireguardEvent{}
+		v := cavpnEvent{}
 		err := wsjson.Read(ctx, conn, &v)
 		if err != nil {
 			log.Println("error reading from websocket, reconnecting", err)
@@ -83,7 +83,7 @@ func (s *Subscriber) read(ctx context.Context, channel chan<- WireguardEvent, co
 	}
 }
 
-func (s *Subscriber) reconnect(ctx context.Context, channel chan<- WireguardEvent) {
+func (s *Subscriber) reconnect(ctx context.Context, channel chan<- cavpnEvent) {
 	// Sleep
 	time.Sleep(time.Second)
 

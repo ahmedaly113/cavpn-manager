@@ -1,13 +1,13 @@
-name: "wireguard-manager"
+name: "cavpn-manager"
 arch: "amd64"
 platform: "linux"
 version: "${VERSION}"
-maintainer: Mullvad Developers
+maintainer: ahmedaly113 Developers
 bindir: "/usr/local/bin"
 files:
-  ./wg-manager: "/usr/local/bin/wireguard-manager"
+  ./cavpn-manager: "/usr/local/bin/cavpn-manager"
 config_files:
-  ./packaging/wireguard-manager.service: "/etc/systemd/system/wireguard-manager.service"
+  ./packaging/cavpn-manager.service: "/etc/systemd/system/cavpn-manager.service"
 overrides:
   deb:
     scripts:
