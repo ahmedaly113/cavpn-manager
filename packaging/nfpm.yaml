@@ -1,0 +1,17 @@
+name: "wireguard-manager"
+arch: "amd64"
+platform: "linux"
+version: "${VERSION}"
+maintainer: Mullvad Developers
+bindir: "/usr/local/bin"
+files:
+  ./wg-manager: "/usr/local/bin/wireguard-manager"
+config_files:
+  ./packaging/wireguard-manager.service: "/etc/systemd/system/wireguard-manager.service"
+overrides:
+  deb:
+    scripts:
+      preinstall: ./packaging/preinstall.sh
+      postinstall: ./packaging/postinstall.sh
+      preremove: ./packaging/preremove.sh
+      postremove: ./packaging/postremove.sh
